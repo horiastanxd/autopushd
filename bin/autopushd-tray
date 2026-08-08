@@ -42,8 +42,8 @@ def scan_status():
 
     dirty, ahead, behind, total = [], [], [], 0
     for line in out.splitlines():
-        parts = line.split()
-        if not parts:
+        parts = line.split("|")
+        if len(parts) < 2:
             continue
         kind = parts[0]
         repo = parts[1]

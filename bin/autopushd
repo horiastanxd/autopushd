@@ -61,12 +61,12 @@ while IFS= read -r root; do
 
         if [ "$STATUS_ONLY" -eq 1 ]; then
             if [ -z "$upstream" ]; then
-                echo "NOUP $repo dirty=$dirty https=$is_https"
+                echo "NOUP|$repo|dirty=$dirty|https=$is_https"
                 continue
             fi
             ahead="$(git rev-list --count "$upstream..HEAD" 2>/dev/null || echo 0)"
             behind="$(git rev-list --count "HEAD..$upstream" 2>/dev/null || echo 0)"
-            echo "STATUS $repo dirty=$dirty ahead=$ahead behind=$behind https=$is_https"
+            echo "STATUS|$repo|dirty=$dirty|ahead=$ahead|behind=$behind|https=$is_https"
             continue
         fi
 
