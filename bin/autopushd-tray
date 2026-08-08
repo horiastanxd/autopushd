@@ -118,7 +118,7 @@ class Tray:
                 menu.append(group)
                 for repo in sorted(repos)[:10]:
                     item = Gtk.MenuItem(label=f"  {os.path.basename(repo)}")
-                    item.set_sensitive(False)
+                    item.connect("activate", self.open_folder, repo)
                     menu.append(item)
                 menu.append(Gtk.SeparatorMenuItem())
 
@@ -163,6 +163,9 @@ class Tray:
 
     def open_log(self, _widget):
         subprocess.Popen(["xdg-open", LOG_FILE])
+
+    def open_folder(self, _widget, repo_path):
+        subprocess.Popen(["xdg-open", repo_path])
 
 
 def main():
