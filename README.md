@@ -57,8 +57,27 @@ Everything lands in `~/.config/autopushd/autopushd.log`. **Nothing is force-push
 | Every 15 min | `systemd --user` timer | forgetting entirely |
 | Logout / shutdown | `ExecStop` on a user service | graceful shutdown |
 | Suspend / lid close | `/usr/lib/systemd/system-sleep/` hook | the case that actually loses work |
+| "Sync now" in tray | manual, on demand | you want it done right now |
 
 The suspend hook runs as root (a systemd requirement) but re-enters your user's `systemd --user` environment to pick up your real `SSH_AUTH_SOCK` — it authenticates exactly as you would.
+
+## Tray indicator
+
+An optional system tray icon shows live status at a glance, with no polling of the network — it reads local git state (`autopushd --status`, a read-only scan, no commit/pull/push):
+
+| Icon state | Meaning |
+|---|---|
+| ✅ green check | every repo clean, committed, pushed |
+| ⚠️ warning | some repo has uncommitted or unpushed changes |
+| 🔄 refresh | some repo is behind its upstream — needs a pull |
+
+Click it for a breakdown per repo, or hit **Sync now** to trigger an immediate commit + pull + push across everything — no waiting for the next timer tick.
+
+```bash
+./install.sh   # answer "y" to the tray prompt
+```
+
+Built on GTK3 + AppIndicator (Ayatana, with a fallback to legacy `AppIndicator3`) — both ship by default on Ubuntu/Debian desktops, so there's nothing extra to `pip install`. On stock GNOME you'll need the **"AppIndicator and KStatusNotifierItem Support"** extension for the icon to actually render in the top bar; KDE, XFCE, and most other DEs show it natively.
 
 ## Install
 

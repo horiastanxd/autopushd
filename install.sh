@@ -25,4 +25,18 @@ if [[ "$ans" =~ ^[Yy]$ ]]; then
     echo "Hook de suspend instalat la /usr/lib/systemd/system-sleep/autopushd-sleep"
 fi
 
+echo
+if python3 -c "import gi; gi.require_version('Gtk','3.0'); from gi.repository import Gtk" 2>/dev/null; then
+    read -r -p "Instalezi si tray-ul (icon in system tray cu status live)? [y/N] " ans_tray
+    if [[ "$ans_tray" =~ ^[Yy]$ ]]; then
+        install -m 755 "$SCRIPT_DIR/bin/autopushd-tray" "$HOME/.local/bin/autopushd-tray"
+        cp "$SCRIPT_DIR/systemd/autopushd-tray.service" "$HOME/.config/systemd/user/"
+        systemctl --user daemon-reload
+        systemctl --user enable --now autopushd-tray.service
+        echo "Tray pornit. Pe GNOME e nevoie de extensia 'AppIndicator and KStatusNotifierItem Support' ca sa apara iconita."
+    fi
+else
+    echo "Tray sarit: lipsesc bindings GTK3 pt python3 (pachet python3-gi). Instaleaza-l si ruleaza din nou install.sh daca il vrei."
+fi
+
 echo "Gata. Ruleaza 'autopushd' manual oricand vrei un sync imediat."

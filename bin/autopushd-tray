@@ -1,0 +1,177 @@
+#!/usr/bin/env python3
+"""System tray indicator for autopushd - shows repo status, triggers sync on demand."""
+import os
+import subprocess
+import sys
+
+import gi
+
+gi.require_version("Gtk", "3.0")
+try:
+    gi.require_version("AyatanaAppIndicator3", "0.1")
+    from gi.repository import AyatanaAppIndicator3 as AppIndicator3
+except (ValueError, ImportError):
+    gi.require_version("AppIndicator3", "0.1")
+    from gi.repository import AppIndicator3
+
+from gi.repository import GLib, Gtk
+
+AUTOPUSHD_BIN = os.path.expanduser("~/.local/bin/autopushd")
+LOG_FILE = os.path.join(
+    os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
+    "autopushd",
+    "autopushd.log",
+)
+POLL_SECONDS = 60
+
+ICON_OK = "emblem-ok-symbolic"
+ICON_DIRTY = "software-update-urgent-symbolic"
+ICON_BEHIND = "view-refresh-symbolic"
+ICON_SYNCING = "view-refresh-symbolic"
+
+
+def scan_status():
+    """Ruleaza autopushd --status si intoarce (dirty, ahead, behind, repos_totale)."""
+    try:
+        out = subprocess.run(
+            [AUTOPUSHD_BIN, "--status"],
+            capture_output=True, text=True, timeout=60,
+        ).stdout
+    except Exception:
+        return None
+
+    dirty, ahead, behind, total = [], [], [], 0
+    for line in out.splitlines():
+        parts = line.split()
+        if not parts:
+            continue
+        kind = parts[0]
+        repo = parts[1]
+        fields = dict(p.split("=", 1) for p in parts[2:] if "=" in p)
+        total += 1
+        if kind == "NOUP":
+            if fields.get("dirty") == "1":
+                dirty.append(repo)
+            continue
+        if fields.get("dirty") == "1":
+            dirty.append(repo)
+        if int(fields.get("ahead", 0)) > 0:
+            ahead.append(repo)
+        if int(fields.get("behind", 0)) > 0:
+            behind.append(repo)
+    return {"dirty": dirty, "ahead": ahead, "behind": behind, "total": total}
+
+
+class Tray:
+    def __init__(self):
+        self.indicator = AppIndicator3.Indicator.new(
+            "autopushd",
+            ICON_OK,
+            AppIndicator3.IndicatorCategory.APPLICATION_STATUS,
+        )
+        self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
+        self.syncing = False
+        self.refresh()
+        GLib.timeout_add_seconds(POLL_SECONDS, self._tick)
+
+    def _tick(self):
+        self.refresh()
+        return True
+
+    def refresh(self):
+        status = scan_status()
+        menu = Gtk.Menu()
+
+        if status is None:
+            self.indicator.set_icon_full(ICON_DIRTY, "autopushd: eroare la scanare")
+            item = Gtk.MenuItem(label="Eroare: nu pot rula autopushd --status")
+            item.set_sensitive(False)
+            menu.append(item)
+        else:
+            needs_push = len(status["dirty"]) + len(status["ahead"])
+            needs_pull = len(status["behind"])
+
+            if self.syncing:
+                icon, summary = ICON_SYNCING, "autopushd: sincronizare in curs..."
+            elif needs_push:
+                icon, summary = ICON_DIRTY, f"autopushd: {needs_push} repo(uri) de commis/pusuit"
+            elif needs_pull:
+                icon, summary = ICON_BEHIND, f"autopushd: {needs_pull} repo(uri) in urma (pull)"
+            else:
+                icon, summary = ICON_OK, f"autopushd: {status['total']} repo(uri), toate la zi"
+
+            self.indicator.set_icon_full(icon, summary)
+
+            header = Gtk.MenuItem(label=summary)
+            header.set_sensitive(False)
+            menu.append(header)
+            menu.append(Gtk.SeparatorMenuItem())
+
+            for label, repos in (
+                ("De commis/pusuit", set(status["dirty"]) | set(status["ahead"])),
+                ("Necesita pull", status["behind"]),
+            ):
+                if not repos:
+                    continue
+                group = Gtk.MenuItem(label=f"{label}:")
+                group.set_sensitive(False)
+                menu.append(group)
+                for repo in sorted(repos)[:10]:
+                    item = Gtk.MenuItem(label=f"  {os.path.basename(repo)}")
+                    item.set_sensitive(False)
+                    menu.append(item)
+                menu.append(Gtk.SeparatorMenuItem())
+
+        sync_item = Gtk.MenuItem(label="Sync acum (commit + pull + push)")
+        sync_item.connect("activate", self.sync_now)
+        sync_item.set_sensitive(not self.syncing)
+        menu.append(sync_item)
+
+        refresh_item = Gtk.MenuItem(label="Refresh status")
+        refresh_item.connect("activate", lambda _: self.refresh())
+        menu.append(refresh_item)
+
+        log_item = Gtk.MenuItem(label="Deschide log")
+        log_item.connect("activate", self.open_log)
+        menu.append(log_item)
+
+        menu.append(Gtk.SeparatorMenuItem())
+        quit_item = Gtk.MenuItem(label="Iesire")
+        quit_item.connect("activate", lambda _: Gtk.main_quit())
+        menu.append(quit_item)
+
+        menu.show_all()
+        self.indicator.set_menu(menu)
+
+    def sync_now(self, _widget):
+        if self.syncing:
+            return
+        self.syncing = True
+        self.refresh()
+
+        def worker():
+            subprocess.run([AUTOPUSHD_BIN], capture_output=True)
+            GLib.idle_add(self._sync_done)
+
+        import threading
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _sync_done(self):
+        self.syncing = False
+        self.refresh()
+        return False
+
+    def open_log(self, _widget):
+        subprocess.Popen(["xdg-open", LOG_FILE])
+
+
+def main():
+    if not os.path.exists(AUTOPUSHD_BIN):
+        print(f"autopushd nu e instalat la {AUTOPUSHD_BIN}", file=sys.stderr)
+        sys.exit(1)
+    Tray()
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    main()
