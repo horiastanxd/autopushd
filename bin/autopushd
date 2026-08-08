@@ -66,7 +66,11 @@ while IFS= read -r root; do
             fi
             ahead="$(git rev-list --count "$upstream..HEAD" 2>/dev/null || echo 0)"
             behind="$(git rev-list --count "HEAD..$upstream" 2>/dev/null || echo 0)"
-            echo "STATUS|$repo|dirty=$dirty|ahead=$ahead|behind=$behind|https=$is_https"
+            writable=1
+            if [ "$ahead" -gt 0 ]; then
+                git push --dry-run origin "HEAD:${upstream#*/}" >/dev/null 2>&1 || writable=0
+            fi
+            echo "STATUS|$repo|dirty=$dirty|ahead=$ahead|behind=$behind|https=$is_https|writable=$writable"
             continue
         fi
 
