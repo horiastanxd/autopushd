@@ -1,0 +1,13 @@
+[Unit]
+Description=Push git repos inainte de logout/shutdown
+DefaultDependencies=no
+Before=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+ExecStop=%h/.local/bin/autopushd
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,10 @@
+#!/bin/sh
+# systemd sleep hook: ruleaza autopushd inainte de suspend/hibernate.
+# Generat de install.sh - __TARGET_USER__ e inlocuit cu userul real.
+case "$1/$2" in
+  pre/*)
+    TARGET_USER="__TARGET_USER__"
+    SOCK="$(runuser -u "$TARGET_USER" -- systemctl --user show-environment 2>/dev/null | sed -n 's/^SSH_AUTH_SOCK=//p')"
+    runuser -u "$TARGET_USER" -- env SSH_AUTH_SOCK="$SOCK" "$(getent passwd "$TARGET_USER" | cut -d: -f6)/.local/bin/autopushd"
+    ;;
+esac

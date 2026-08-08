@@ -1,0 +1,6 @@
+[Unit]
+Description=autopushd - commit+push git repos
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/autopushd
