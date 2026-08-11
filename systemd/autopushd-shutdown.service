@@ -7,7 +7,7 @@ Before=shutdown.target
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/bin/true
-ExecStop=%h/.local/bin/autopushd
+ExecStop=%h/.local/bin/autopushd --no-pull
 
 [Install]
 WantedBy=default.target

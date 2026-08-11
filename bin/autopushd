@@ -4,7 +4,11 @@
 set -uo pipefail
 
 STATUS_ONLY=0
-[ "${1:-}" = "--status" ] && STATUS_ONLY=1
+NO_PULL=0
+for arg in "$@"; do
+    [ "$arg" = "--status" ] && STATUS_ONLY=1
+    [ "$arg" = "--no-pull" ] && NO_PULL=1
+done
 
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/autopushd"
 ROOTS_FILE="$CONFIG_DIR/roots.txt"
@@ -89,7 +93,9 @@ while IFS= read -r root; do
             continue
         fi
 
-        if ! git pull --rebase --autostash >/dev/null 2>&1; then
+        if [ "$NO_PULL" -eq 1 ]; then
+            log "INFO skip pull (--no-pull) in $repo"
+        elif ! git pull --rebase --autostash >/dev/null 2>&1; then
             log "WARN pull --rebase failed in $repo, skip push (rezolva manual conflict)"
             continue
         fi
